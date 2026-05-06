@@ -1,6 +1,7 @@
+import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 from collections import Counter
-from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KNeighborsClassifier
@@ -18,15 +19,31 @@ def calculate_accuracy(y_true, y_pred):
     # calculate accuracy
     return np.sum(y_true == y_pred) / len(y_true)
 
-    pass
+
+    # added second measurement to measure performance
+def calculate_f1(y_true, y_pred):
+    y_pred = np.array(y_pred)
+    y_true = np.array(y_true)
+
+    tp = np.sum((y_true == 1) & (y_pred == 1))
+    tn = np.sum((y_true == 0) & (y_pred == 0))
+    fp = np.sum((y_true == 0) & (y_pred == 1))
+    fn = np.sum((y_true == 1) & (y_pred == 0))
+
+    precision = tp / (tp + fp) if (tp + fp) != 0 else 0
+    recall = tp / (tp + fn) if (tp + fn) != 0 else 0
+    
+
+    return (2 * precision * recall / (precision + recall)) if (precision + recall) != 0 else 0
 
 class KNNClassifier:
     """
     A K-Nearest Neighbors classifier built from scratch.
     """
-    def __init__(self, k=3, metric='euclidean'):
+    def __init__(self, k=3, metric='euclidean', weighted = False):
         self.k = k
         self.metric = metric
+        self.weighted = weighted
         self.X_train, self.y_train = None, None
 
     def fit(self, X, y):
@@ -88,40 +105,52 @@ class KNNClassifier:
         # key = lambda x: x[0] --> tell python to sort based on the distance, not the label
         k_nearest = sorted(distances, key = lambda x: x[0])[:self.k]
         
-        # extract the labels (VOTE!!!)
-        k_labels = [label for (_, label) in k_nearest]
-
-        # majority vote is
-        # Counter counts frequencies
-        # most_common() --> the winner
-        winner, count = Counter(k_labels).most_common(1)[0]
+            
+        if not self.weighted:
+            k_labels = [label for (_, label) in k_nearest]
+            return Counter(k_labels).most_common(1)[0][0]
         
-        return winner
+        label_weights = {}
+
+        for dist, label in k_nearest:
+            weight = 1 / (dist + 1e-8)
+
+            if label in label_weights:
+                label_weights[label] += weight
+            else:
+                label_weights[label] = weight
+            
+        return max(label_weights, key = label_weights.get)
+
 
 
 # --- TASK 2: The Workflow ---
 
+# replaced breast cancer dataset with our kaggle heart dataset
+df = pd.read_csv("heart.csv")
+print(df.head())
+print(df.columns)
 
-# 1. Load and Split Data
-data = load_breast_cancer()
-data.data[:5]
-data.target[:5]
+X = df.drop("HeartDisease", axis = 1)
+y = df["HeartDisease"]
+X = pd.get_dummies(X)
+
 X_train, X_test, y_train, y_test = train_test_split(
-    data.data, data.target, test_size=0.2, random_state=42
+    X, y, test_size = 0.2, random_state = 42
 )
 
 # TODO: Experiment 1 - Raw Data: Euclidean vs Cosine
 print("--- Step 1: Evaluating Raw Data (Unscaled) ---")
-model_euc_raw = KNNClassifier(k = 5, metric = 'euclidean')
+model_euc_raw = KNNClassifier(k = 10, metric = 'euclidean')
 model_euc_raw.fit(X_train, y_train) # storing data
 preds_euc_raw = model_euc_raw.predict(X_test) # y_pred
 
-model_cos_raw = KNNClassifier(k = 5, metric = 'cosine')
+model_cos_raw = KNNClassifier(k = 10, metric = 'cosine')
 model_cos_raw.fit(X_train, y_train)
 preds_cos_raw = model_cos_raw.predict(X_test)
 # Instantiate, fit, and predict using both metrics. Print the accuracies.
-print(f'Euclidean Raw Accuracy {calculate_accuracy(y_test, preds_euc_raw):.4f}%')
-print(f'Cosine Raw Accuracy {calculate_accuracy(y_test, preds_cos_raw):.4f}%')
+print(f'Euclidean Raw Accuracy {100*calculate_accuracy(y_test, preds_euc_raw):.4f}%')
+print(f'Cosine Raw Accuracy {100*calculate_accuracy(y_test, preds_cos_raw):.4f}%')
 
 
 # TODO: Experiment 2 - Scaled Data: Euclidean vs Cosine
@@ -133,11 +162,11 @@ X_train_scaled = scaler.fit_transform(X_train)
 X_test_scaled = scaler.transform(X_test)
 
 # evaluate on scaled data
-model_euc_scaled = KNNClassifier(k = 5, metric = 'euclidean')
+model_euc_scaled = KNNClassifier(k = 10, metric = 'euclidean')
 model_euc_scaled.fit(X_train_scaled, y_train)
 preds_euc_scaled = model_euc_scaled.predict(X_test_scaled)
 
-model_cos_scaled = KNNClassifier(k = 5, metric = 'cosine')
+model_cos_scaled = KNNClassifier(k = 10, metric = 'cosine')
 model_cos_scaled.fit(X_train_scaled, y_train)
 preds_cos_scaled = model_cos_scaled.predict(X_test_scaled)
 
@@ -145,11 +174,86 @@ print(f'Euclidean Scaled Accuracy: {100*calculate_accuracy(y_test, preds_euc_sca
 print(f'Cosine Scaled Accuracy: {100*calculate_accuracy(y_test, preds_cos_scaled):.4f}%')
 
 
-# TODO: Experiment 3 - Sklearn Comparison
-print("\n--- Step 3: Sklearn Comparison ---")
-# Compare your Scaled Euclidean result with sklearn's KNeighborsClassifier.
-sk_knn_scaled = KNeighborsClassifier(n_neighbors = 5, metric = 'euclidean')
-sk_knn_scaled.fit(X_train_scaled, y_train)
-sk_preds_scaled = sk_knn_scaled.predict(X_test_scaled)
 
-print(f'Sklearn scaled accuracy: {100*calculate_accuracy(y_test, sk_preds_scaled):.4f}%')
+# Step 3: Weighted KNN
+print("\n--- Step 3: Weighted KNN ---")
+
+
+print("\n--- Standard vs Weighted KNN and F1 Comparison ---")
+
+k_values = [1, 3, 5, 7, 10, 15]
+
+print("\nK | Std Acc | W Acc | Std F1 | W F1")
+print("------------------------------------------------")
+
+standard_accs = []
+weighted_accs = []
+standard_f1s = []
+weighted_f1s = []
+
+# loop through k values to measure how performance changes
+for k in k_values:
+    # Standard knn
+    std_model = KNNClassifier(k=k, metric='euclidean', weighted=False)
+    std_model.fit(X_train_scaled, y_train)
+    std_preds = std_model.predict(X_test_scaled)
+
+    std_acc = calculate_accuracy(y_test, std_preds)
+    std_f1 = calculate_f1(y_test, std_preds)
+
+    standard_accs.append(std_acc)
+    standard_f1s.append(std_f1)
+
+    # Weighted knn
+    w_model = KNNClassifier(k=k, metric='euclidean', weighted=True)
+    w_model.fit(X_train_scaled, y_train)
+    w_preds = w_model.predict(X_test_scaled)
+
+    w_acc = calculate_accuracy(y_test, w_preds)
+    w_f1 = calculate_f1(y_test, w_preds)
+
+    weighted_accs.append(w_acc)
+    weighted_f1s.append(w_f1)
+
+    print(f"{k:2} | {std_acc*100:7.2f}% | {w_acc*100:7.2f}% | {std_f1:.3f} | {w_f1:.3f}")
+
+
+best_k_std = k_values[np.argmax(standard_accs)]
+best_k_weighted = k_values[np.argmax(weighted_accs)]
+
+print("\nBest k (Standard KNN):", best_k_std)
+print("Best k (Weighted KNN):", best_k_weighted)
+
+
+# Cool graphs
+# Graph 1: dot graph
+standard_accs_pct = [a * 100 for a in standard_accs]
+weighted_accs_pct = [a * 100 for a in weighted_accs]
+
+plt.figure()
+
+plt.plot(k_values, standard_accs_pct, marker='o', label='Standard KNN')
+plt.plot(k_values, weighted_accs_pct, marker='o', label='Weighted KNN')
+
+plt.title("K Value vs Accuracy: Standard vs Weighted KNN")
+plt.xlabel("k")
+plt.ylabel("Accuracy (%)")
+plt.legend()
+
+plt.show()
+
+# Graph 2: percentage comparison chart
+improvement = np.array(weighted_accs) - np.array(standard_accs)
+improvement_pct = improvement * 100
+
+plt.figure()
+
+plt.plot(k_values, improvement_pct, marker='o')
+
+plt.axhline(0, linestyle='--')
+
+plt.title("Performance Gain of Weighted KNN over Standard KNN")
+plt.xlabel("k")
+plt.ylabel("Accuracy Improvement (%)")
+
+plt.show()
