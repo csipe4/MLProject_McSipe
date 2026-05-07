@@ -12,7 +12,7 @@ def calculate_accuracy(y_true, y_pred):
     Returns the ratio of correct predictions to total predictions.
     Do not use sklearn.metrics for this implementation.
     """
-    # TODO: Implement manual accuracy calculation
+    # Implement manual accuracy calculation
     # turn data into arrays
     y_true, y_pred = np.array(y_true), np.array(y_pred)
 
@@ -63,7 +63,7 @@ class KNNClassifier:
         """
         Calculates the L2 Norm: sqrt(sum((x_i - y_i)^2))
         """
-        # TODO: Implement the Euclidean distance formula
+        # Implement the Euclidean distance formula
         # standard straight-line distance
         # Pythagorean Theorem
         return np.sqrt(np.sum((row1 - row2)**2))
@@ -73,7 +73,7 @@ class KNNClassifier:
         Calculates (u . v) / (||u|| * ||v||).
         Must handle zero division.
         """
-        # TODO: Implement Dot Product / (Norm A * Norm B)
+        # Implement Dot Product / (Norm A * Norm B)
         # measure the angle between the vectors
         # NOT DISTANCE
         # best for higher-dimensional or text
@@ -88,7 +88,7 @@ class KNNClassifier:
         """
         distances = []
         for i, x_train in enumerate(self.X_train):
-            # TODO: Calculate distance based on self.metric. 
+            # Calculate distance based on self.metric. 
             # Hint: if metric is 'cosine', distance = 1 - similarity.
             if self.metric == 'euclidean':
                 # lower value = closer
@@ -139,7 +139,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size = 0.2, random_state = 42
 )
 
-# TODO: Experiment 1 - Raw Data: Euclidean vs Cosine
+# Experiment 1 - Raw Data: Euclidean vs Cosine
 print("--- Step 1: Evaluating Raw Data (Unscaled) ---")
 model_euc_raw = KNNClassifier(k = 10, metric = 'euclidean')
 model_euc_raw.fit(X_train, y_train) # storing data
@@ -153,7 +153,7 @@ print(f'Euclidean Raw Accuracy {100*calculate_accuracy(y_test, preds_euc_raw):.4
 print(f'Cosine Raw Accuracy {100*calculate_accuracy(y_test, preds_cos_raw):.4f}%')
 
 
-# TODO: Experiment 2 - Scaled Data: Euclidean vs Cosine
+# Experiment 2 - Scaled Data: Euclidean vs Cosine
 print("\n--- Step 2: Evaluating Scaled Data ---")
 # Use StandardScaler to transform the data.
 scaler = StandardScaler() # mean = 0, st = 1
@@ -191,7 +191,7 @@ weighted_accs = []
 standard_f1s = []
 weighted_f1s = []
 
-# loop through k values to measure how performance changes
+# Loop through k values to measure how performance changes
 for k in k_values:
     # Standard knn
     std_model = KNNClassifier(k=k, metric='euclidean', weighted=False)
@@ -225,7 +225,6 @@ print("\nBest k (Standard KNN):", best_k_std)
 print("Best k (Weighted KNN):", best_k_weighted)
 
 
-# Cool graphs
 # Graph 1: dot graph
 standard_accs_pct = [a * 100 for a in standard_accs]
 weighted_accs_pct = [a * 100 for a in weighted_accs]
